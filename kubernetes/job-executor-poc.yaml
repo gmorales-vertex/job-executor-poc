@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: job-executor-poc
+  name: job-executor-poc-dp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: job-executor-poc
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: job-executor-poc
+    spec:
+      serviceAccountName: job-executor-poc-service-account
+      containers:
+      - image: glennmorales/job-executor-poc:1
+        name: job-executor-poc
+        resources: 
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "500Mi"
+            cpu: "500m"  
+        
+      # not needed for local 
+      # imagePullSecrets:
+      #   - name: gcm-k3s-secret
+status: {}

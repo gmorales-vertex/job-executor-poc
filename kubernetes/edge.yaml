@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: job-executor-poc-service-account
+  namespace: default
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: job-executor-poc-service-account-role
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get","list","patch","update","watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get","list","patch","update","watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get","list","watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: job-executor-poc-service-account-role-binding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: job-executor-poc-service-account
+roleRef:
+  kind: Role
+  name: job-executor-poc-service-account-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-deployment
+  labels:
+    app: edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: edge
+    spec:
+      containers:
+        - name: edge
+          image: glennmorales/testsr15:gcm-SR-15-0-25-2-4825
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 1
+              memory: 5124Mi
+            requests:
+              cpu: 1
+              memory: 4024Mi
+          ports:
+            - containerPort: 8585
+              name: edge-port
+              protocol: TCP
+            - containerPort: 9001
+              name: prometheus-port
+              protocol: TCP
+          env:  
+            - name: ite_metrics_enabled
+              value: 'true'
+            - name: ite_oauth_client_id
+              value: 'f6fa3d07b2b842ce8cf2671e7dd9a1e4'
+            - name: ite_oauth_client_secret
+              value: '1e536401059b4bb188704041bbc7afec'
+            - name: ite_metrics_schedule
+              value: '30000'
+            - name: 'ite_oauth_oseries_jwksurl'
+              value: 'http://10.4.19.43:8095/oseries-auth/oauth/jwks'  
+            - name: 'JOURNAL_AUTOMATION'
+              value: 'false'    
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name    
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: gcm-k3s-secret
+      restartPolicy: Always
+--- 
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-service
+spec:
+  type: NodePort
+  selector:
+    app: edge
+  ports:
+    - name: edge
+      protocol: TCP
+      port: 8585
+      targetPort: 8585
+    - name: prometheus
+      protocol: TCP
+      port: 9001
+      targetPort: 9001
